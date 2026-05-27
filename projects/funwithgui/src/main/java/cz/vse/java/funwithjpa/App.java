@@ -11,6 +11,10 @@ import org.slf4j.LoggerFactory;
 
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.Persistence;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 
 public class App extends Application {
     private static final Logger LOG = LoggerFactory.getLogger(App.class);
@@ -21,17 +25,38 @@ public class App extends Application {
 
     public static void main(String[] args) {
         LOG.info("Application started.");
-        EMF = Persistence.createEntityManagerFactory("punit");
+
+        try {
+            Properties props = new Properties();
+            try (InputStream input = App.class.getClassLoader().getResourceAsStream("database.properties")) {
+                if (input == null) {
+                    LOG.error("Sorry, unable to find database.properties");
+                } else {
+                    props.load(input);
+                }
+            }
+
+            Map<String, String> properties = new HashMap<>();
+            for (String key : props.stringPropertyNames()) {
+                properties.put(key, props.getProperty(key));
+            }
+
+            EMF = Persistence.createEntityManagerFactory("punit", properties);
+        } catch (Exception e) {
+            LOG.error("Failed to initialize EntityManagerFactory", e);
+        }
 
         Application.launch(args);
 
-        EMF.close();
+        if (EMF != null) {
+            EMF.close();
+        }
         LOG.info("Application terminated.");
     }
 
     @Override
     public void start(final Stage stage) throws Exception {
-        gui = new Gui(new Controller());
+        gui = new Gui(new Controller(EMF));
 
         Scene scene = new Scene(new Group());
         ((Group) scene.getRoot()).getChildren().addAll(gui.getPane());
